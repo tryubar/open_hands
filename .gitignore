@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+server.log
+gmail-dashboard.tar.gz
+open_hands/

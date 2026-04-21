@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gmail Daily Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: #f8f9fa;
+            color: #202124;
+            line-height: 1.5;
+            min-height: 100vh;
+        }
+
+        /* Header */
+        .header {
+            position: sticky;
+            top: 0;
+            background: #ffffff;
+            border-bottom: 1px solid #dadce0;
+            padding: 16px 24px;
+            z-index: 100;
+        }
+
+        .header-content {
+            max-width: 800px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo svg {
+            width: 32px;
+            height: 32px;
+        }
+
+        .logo h1 {
+            font-size: 20px;
+            font-weight: 600;
+            color: #202124;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .user-email {
+            font-size: 14px;
+            color: #5f6368;
+        }
+
+        .logout-btn {
+            background: none;
+            border: none;
+            color: #1a73e8;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            padding: 8px 12px;
+            border-radius: 4px;
+            transition: background 0.2s ease;
+        }
+
+        .logout-btn:hover {
+            background: rgba(26, 115, 232, 0.08);
+        }
+
+        /* Main Content */
+        .main {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        /* Sign In Section */
+        .sign-in-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 60vh;
+            text-align: center;
+        }
+
+        .sign-in-icon {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 24px;
+        }
+
+        .sign-in-section h2 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+
+        .sign-in-section p {
+            color: #5f6368;
+            margin-bottom: 32px;
+        }
+
+        .sign-in-btn {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: #1a73e8;
+            color: white;
+            border: none;
+            padding: 16px 32px;
+            font-size: 16px;
+            font-weight: 500;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .sign-in-btn:hover {
+            background: #1557b0;
+            box-shadow: 0 2px 8px rgba(26, 115, 232, 0.4);
+        }
+
+        .sign-in-btn svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        /* Email Stats */
+        .email-stats {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: #ffffff;
+            border-radius: 8px;
+            padding: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+            flex: 1;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 32px;
+            font-weight: 600;
+            color: #1a73e8;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            color: #5f6368;
+        }
+
+        /* Email List */
+        .email-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        /* Email Card */
+        .email-card {
+            background: #ffffff;
+            border-radius: 8px;
+            padding: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .email-card:hover {
+            box-shadow: 0 2px 6px rgba(0,0,0,0.16);
+            transform: translateY(-1px);
+        }
+
+        .email-card.expanded {
+            cursor: default;
+        }
+
+        .email-card.expanded:hover {
+            transform: none;
+        }
+
+        .email-header {
+            display: flex;
+            gap: 12px;
+        }
+
+        .avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #1a73e8;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+
+        .email-meta {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .email-from {
+            font-weight: 500;
+            font-size: 14px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .email-subject {
+            font-size: 16px;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .email-date {
+            font-size: 12px;
+            color: #5f6368;
+        }
+
+        .email-snippet {
+            margin-top: 12px;
+            font-size: 14px;
+            color: #5f6368;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .email-body {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid #dadce0;
+            font-size: 14px;
+            line-height: 1.6;
+            color: #202124;
+            white-space: pre-wrap;
+            word-break: break-word;
+            display: none;
+        }
+
+        .email-card.expanded .email-snippet {
+            display: none;
+        }
+
+        .email-card.expanded .email-body {
+            display: block;
+        }
+
+        .expand-hint {
+            font-size: 12px;
+            color: #1a73e8;
+            text-align: center;
+            margin-top: 8px;
+        }
+
+        /* Loading State */
+        .loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 40vh;
+            text-align: center;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #dadce0;
+            border-top-color: #1a73e8;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 16px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Empty State */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 40vh;
+            text-align: center;
+        }
+
+        .empty-state svg {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 24px;
+            color: #dadce0;
+        }
+
+        .empty-state h3 {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .empty-state p {
+            color: #5f6368;
+        }
+
+        /* Error State */
+        .error-state {
+            background: #fce8e6;
+            border-radius: 8px;
+            padding: 24px;
+            text-align: center;
+        }
+
+        .error-state h3 {
+            color: #ea4335;
+            margin-bottom: 12px;
+        }
+
+        .retry-btn {
+            background: #1a73e8;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 14px;
+            font-weight: 500;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 16px;
+        }
+
+        .retry-btn:hover {
+            background: #1557b0;
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 24px;
+            color: #5f6368;
+            font-size: 12px;
+        }
+
+        /* Hidden */
+        .hidden {
+            display: none !important;
+        }
+
+        /* Responsive */
+        @media (max-width: 600px) {
+            .header-content {
+                flex-direction: column;
+                gap: 12px;
+            }
+
+            .main {
+                padding: 16px;
+            }
+
+            .email-stats {
+                flex-direction: column;
+            }
+
+            .user-email {
+                font-size: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M20 4H4C2.9 4 2 4.9 2 6V18C2 19.1 2.9 20 4 20H20C21.1 20 22 19.1 22 18V6C22 4.9 21.1 4 20 4ZM20 8L12 13L4 8V6L12 11L20 6V8Z" fill="#1a73e8"/>
+                </svg>
+                <h1>Gmail Dashboard</h1>
+            </div>
+            <div class="user-info hidden" id="userInfo">
+                <span class="user-email" id="userEmail"></span>
+                <button class="logout-btn" onclick="logout()">Sign out</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main">
+        <!-- Sign In Section -->
+        <section class="sign-in-section" id="signInSection">
+            <svg class="sign-in-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M20 4H4C2.9 4 2 4.9 2 6V18C2 19.1 2.9 20 4 20H20C21.1 20 22 19.1 22 18V6C22 4.9 21.1 4 20 4ZM20 8L12 13L4 8V6L12 11L20 6V8Z" fill="#1a73e8"/>
+            </svg>
+            <h2>View Your Daily Emails</h2>
+            <p>Sign in to see emails from the past 24 hours</p>
+            <button class="sign-in-btn" onclick="signIn()">
+                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                </svg>
+                Sign in with Google
+            </button>
+        </section>
+
+        <!-- Email Dashboard Section -->
+        <section class="hidden" id="emailDashboard">
+            <!-- Loading -->
+            <div class="loading" id="loadingState">
+                <div class="spinner"></div>
+                <p>Loading your emails...</p>
+            </div>
+
+            <!-- Stats -->
+            <div class="email-stats hidden" id="emailStats">
+                <div class="stat-card">
+                    <div class="stat-number" id="emailCount">0</div>
+                    <div class="stat-label">Emails Today</div>
+                </div>
+            </div>
+
+            <!-- Error State -->
+            <div class="error-state hidden" id="errorState">
+                <h3>Unable to Load Emails</h3>
+                <p id="errorMessage">Something went wrong. Please try again.</p>
+                <button class="retry-btn" onclick="loadEmails()">Try Again</button>
+            </div>
+
+            <!-- Empty State -->
+            <div class="empty-state hidden" id="emptyState">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M20 4H4C2.9 4 2 4.9 2 6V18C2 19.1 2.9 20 4 20H20C21.1 20 22 19.1 22 18V6C22 4.9 21.1 4 20 4ZM20 8L12 13L4 8V6L12 11L20 6V8Z"/>
+                </svg>
+                <h3>No emails today</h3>
+                <p>Check back tomorrow to see your new emails</p>
+            </div>
+
+            <!-- Email List -->
+            <div class="email-list hidden" id="emailList"></div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        Powered by Gmail API
+    </footer>
+
+    <script>
+        // State
+        let isAuthenticated = false;
+        let emails = [];
+        let expandedEmailId = null;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', checkAuth);
+
+        async function checkAuth() {
+            try {
+                const response = await fetch('/api/user');
+                if (response.ok) {
+                    const user = await response.json();
+                    showDashboard(user);
+                } else {
+                    showSignIn();
+                }
+            } catch (error) {
+                showSignIn();
+            }
+        }
+
+        function showSignIn() {
+            isAuthenticated = false;
+            document.getElementById('signInSection').classList.remove('hidden');
+            document.getElementById('emailDashboard').classList.add('hidden');
+            document.getElementById('userInfo').classList.add('hidden');
+        }
+
+        function showDashboard(user) {
+            isAuthenticated = true;
+            document.getElementById('signInSection').classList.add('hidden');
+            document.getElementById('emailDashboard').classList.remove('hidden');
+            document.getElementById('userInfo').classList.remove('hidden');
+            document.getElementById('userEmail').textContent = user.email;
+            loadEmails();
+        }
+
+        async function signIn() {
+            window.location.href = '/auth/login';
+        }
+
+        async function logout() {
+            try {
+                await fetch('/auth/logout', { method: 'POST' });
+                showSignIn();
+            } catch (error) {
+                console.error('Logout error:', error);
+            }
+        }
+
+        async function loadEmails() {
+            const loadingState = document.getElementById('loadingState');
+            const emailStats = document.getElementById('emailStats');
+            const errorState = document.getElementById('errorState');
+            const emptyState = document.getElementById('emptyState');
+            const emailList = document.getElementById('emailList');
+
+            // Reset states
+            loadingState.classList.remove('hidden');
+            emailStats.classList.add('hidden');
+            errorState.classList.add('hidden');
+            emptyState.classList.add('hidden');
+            emailList.classList.add('hidden');
+
+            try {
+                const response = await fetch('/api/emails');
+                const data = await response.json();
+
+                loadingState.classList.add('hidden');
+
+                if (data.error) {
+                    errorState.classList.remove('hidden');
+                    document.getElementById('errorMessage').textContent = data.error;
+                    return;
+                }
+
+                emails = data.emails || [];
+                document.getElementById('emailCount').textContent = emails.length;
+
+                if (emails.length === 0) {
+                    emptyState.classList.remove('hidden');
+                } else {
+                    emailStats.classList.remove('hidden');
+                    renderEmails(emails);
+                    emailList.classList.remove('hidden');
+                }
+            } catch (error) {
+                loadingState.classList.add('hidden');
+                errorState.classList.remove('hidden');
+                document.getElementById('errorMessage').textContent = error.message;
+            }
+        }
+
+        function renderEmails(emails) {
+            const emailList = document.getElementById('emailList');
+            emailList.innerHTML = '';
+
+            emails.forEach(email => {
+                const card = createEmailCard(email);
+                emailList.appendChild(card);
+            });
+        }
+
+        function createEmailCard(email) {
+            const card = document.createElement('div');
+            card.className = 'email-card';
+            card.dataset.id = email.id;
+
+            const initials = getInitials(email.from);
+            const date = formatDate(email.date);
+            const displayFrom = email.from.replace(/<[^>]+>/, '').trim();
+
+            card.innerHTML = `
+                <div class="email-header">
+                    <div class="avatar">${initials}</div>
+                    <div class="email-meta">
+                        <div class="email-from">${escapeHtml(displayFrom)}</div>
+                        <div class="email-subject">${escapeHtml(email.subject)}</div>
+                        <div class="email-date">${date}</div>
+                    </div>
+                </div>
+                <div class="email-snippet">${escapeHtml(email.snippet)}</div>
+                <div class="email-body">${escapeHtml(email.body)}</div>
+                <div class="expand-hint">Click to expand</div>
+            `;
+
+            card.addEventListener('click', () => toggleEmail(card, email.id));
+
+            return card;
+        }
+
+        function toggleEmail(card, emailId) {
+            const wasExpanded = card.classList.contains('expanded');
+
+            // Collapse all cards
+            document.querySelectorAll('.email-card').forEach(c => {
+                c.classList.remove('expanded');
+                const hint = c.querySelector('.expand-hint');
+                if (hint) hint.textContent = 'Click to expand';
+            });
+
+            // Toggle this card
+            if (!wasExpanded) {
+                card.classList.add('expanded');
+                const hint = card.querySelector('.expand-hint');
+                if (hint) hint.textContent = 'Click to collapse';
+            }
+        }
+
+        function getInitials(name) {
+            const parts = name.split(/[\s@]+/).filter(p => p && p.length > 1);
+            if (parts.length >= 2) {
+                return (parts[0][0] + parts[1][0]).toUpperCase().slice(0, 2);
+            }
+            return (parts[0]?.[0] || '?').toUpperCase();
+        }
+
+        function formatDate(dateStr) {
+            try {
+                const date = new Date(dateStr);
+                const now = new Date();
+                const diff = now - date;
+                const dayDiff = Math.floor(diff / (1000 * 60 * 60 * 24));
+
+                if (dayDiff === 0) {
+                    return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+                } else if (dayDiff === 1) {
+                    return 'Yesterday';
+                } else if (dayDiff < 7) {
+                    return date.toLocaleDateString('en-US', { weekday: 'long' });
+                } else {
+                    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                }
+            } catch {
+                return '';
+            }
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
