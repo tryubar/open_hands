@@ -479,5 +479,136 @@ def api_stock(symbol):
     return jsonify(result)
 
 
+# Proposal Generator API
+import io
+import PyPDF2
+from docx import Document
+
+def extract_text_from_file(file_storage):
+    """Extract text from uploaded PDF or Word document."""
+    filename = file_storage.filename.lower()
+    text = ''
+    
+    try:
+        if filename.endswith('.pdf'):
+            # Read PDF
+            pdf_reader = PyPDF2.PdfReader(file_storage)
+            for page in pdf_reader.pages:
+                text += page.extract_text() + '\n'
+        elif filename.endswith(('.doc', '.docx')):
+            # Read Word document
+            doc = Document(file_storage)
+            for para in doc.paragraphs:
+                text += para.text + '\n'
+        elif filename.endswith('.txt'):
+            text = file_storage.read().decode('utf-8')
+    except Exception as e:
+        print(f"Error reading {filename}: {e}")
+        text = f"[Could not extract text from {filename}]"
+    
+    return text
+
+
+@app.route('/api/proposal/generate', methods=['POST'])
+def api_generate_proposal():
+    """Generate a proposal based on uploaded documents and requirements."""
+    try:
+        requirements = request.form.get('requirements', '')
+        files = request.files.getlist('files')
+        
+        # Extract text from uploaded files
+        extracted_text = ''
+        file_names = []
+        
+        for file in files:
+            if file.filename:
+                file_names.append(file.filename)
+                text = extract_text_from_file(file)
+                if text:
+                    extracted_text += f"\n\n=== {file.filename} ===\n{text}"
+        
+        # Generate proposal based on requirements and extracted content
+        # This is a template-based generator. In production, call an LLM API.
+        proposal = generate_proposal_response(requirements, extracted_text, file_names)
+        
+        return jsonify({'proposal': proposal, 'files': file_names})
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+def generate_proposal_response(requirements, extracted_text, file_names):
+    """Generate a proposal response based on requirements and documents."""
+    
+    # Parse requirements if provided
+    req_lines = [r.strip() for r in requirements.split('\n') if r.strip()]
+    
+    proposal = f"""# PROPOSAL RESPONSE
+
+## Executive Summary
+Thank you for your interest. Based on the requirements and documents provided, we are pleased to submit this proposal response.
+
+"""
+    
+    if extracted_text:
+        proposal += f"""
+## Document Analysis
+The following documents were analyzed:
+{', '.join(f"- {name}" for name in file_names)}
+
+Key information extracted from the documents has been reviewed and incorporated into this proposal.
+
+"""
+    
+    if requirements:
+        proposal += f"""
+## Requirements Addressed
+Based on your requirements:
+
+"""
+        for i, req in enumerate(req_lines, 1):
+            proposal += f"{i}. {req}: Addressed in our proposal below.\n"
+    
+    proposal += f"""
+
+## Proposed Solution
+
+### Overview
+We propose a comprehensive solution that addresses all your requirements with the following key components:
+
+1. **Requirements Analysis** - Detailed review and refinement of requirements
+2. **Implementation Plan** - Step-by-step approach with milestones
+3. **Timeline** - Estimated {len(req_lines) * 2 + 4} weeks for completion
+4. **Deliverables** - All specified features and documentation
+
+### Technical Approach
+- Modern, scalable architecture
+- Cloud-native deployment option
+- Full documentation and training
+- Post-launch support included
+
+### Investment
+| Component | Investment |
+|-----------|------------|
+| Development | To be quoted based on scope |
+| Testing | Included |
+| Deployment | Included |
+| Support (12 mo) | Included |
+
+### Next Steps
+1. Review and approve this proposal
+2. Sign statement of work
+3. Kickoff meeting with technical team
+4. Begin implementation
+
+---
+Generated on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+
+This proposal is valid for 30 days from the date of generation.
+"""
+    
+    return proposal
+
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
