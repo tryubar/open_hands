@@ -413,5 +413,71 @@ def api_slack_messages():
     return jsonify({'messages': result, 'cached': False})
 
 
+# Stock API - using Yahoo Finance
+STOCK_CACHE = {}
+STOCK_CACHE_TTL = 60  # 60 seconds for stock data
+
+def fetch_stock_price(symbol):
+    """Fetch stock price from Yahoo Finance."""
+    try:
+        # Use Yahoo Finance API (query1)
+        url = f'https://query1.finance.yahoo.com/v8/finance/chart/{symbol}'
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        
+        response = requests.get(url, headers=headers, timeout=10)
+        
+        if response.status_code != 200:
+            return {'error': f'HTTP error: {response.status_code}'}
+        
+        data = response.json()
+        
+        if 'chart' not in data or 'result' not in data['chart'] or not data['chart']['result']:
+            return {'error': 'Invalid response from Yahoo Finance'}
+        
+        result = data['chart']['result'][0]
+        meta = result.get('meta', {})
+        quote = result.get('indicators', {}).get('quote', [{}])[0]
+        
+        current_price = meta.get('regularMarketPrice', 0)
+        previous_close = meta.get('previousClose', current_price)
+        
+        return {
+            'symbol': symbol,
+            'price': current_price,
+            'change': current_price - previous_close,
+            'changePercent': ((current_price - previous_close) / previous_close * 100) if previous_close else 0,
+            'open': quote.get('open', [current_price])[-1] if quote.get('open') else current_price,
+            'high': meta.get('regularMarketDayHigh', current_price),
+            'low': meta.get('regularMarketDayLow', current_price),
+            'volume': meta.get('regularMarketVolume', 0),
+            'timestamp': datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
+        }
+        
+    except Exception as e:
+        return {'error': str(e)}
+
+
+@app.route('/api/stock/<symbol>')
+def api_stock(symbol):
+    """Fetch stock data for the given symbol."""
+    global STOCK_CACHE
+    
+    symbol = symbol.upper()
+    
+    # Check cache
+    if symbol in STOCK_CACHE:
+        cached_time, cached_data = STOCK_CACHE[symbol]
+        if (datetime.now(timezone.utc) - cached_time).total_seconds() < STOCK_CACHE_TTL:
+            return jsonify(cached_data)
+    
+    result = fetch_stock_price(symbol)
+    
+    if isinstance(result, dict) and 'error' in result:
+        return jsonify(result), 400
+    
+    STOCK_CACHE[symbol] = (datetime.now(timezone.utc), result)
+    return jsonify(result)
+
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
