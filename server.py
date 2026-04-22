@@ -6,6 +6,7 @@ Fetches daily emails from Gmail and serves the web interface.
 import os
 import base64
 import email
+import json
 import requests
 from datetime import datetime, timedelta, timezone
 from functools import wraps
@@ -26,9 +27,9 @@ app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-producti
 SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
 CLIENT_SECRETS_FILE = os.path.join(os.path.dirname(__file__), 'client_secret.json')
 
-# Slack API configuration
+# Slack API configuration (via Zapier MCP)
 SLACK_BOT_TOKEN = os.environ.get('SLACK_BOT_TOKEN')
-SLACK_API_URL = 'https://slack.com/api'
+ZAPIER_API_URL = 'https://mcp.zapier.com/api/v1/connect'
 
 # Simple in-memory cache
 email_cache = {}
@@ -267,80 +268,102 @@ def health():
 
 
 def fetch_slack_messages():
-    """Fetch Slack messages from the last 24 hours."""
+    """Fetch Slack messages from the last 24 hours via Zapier MCP."""
     if not SLACK_BOT_TOKEN:
         return {'error': 'Slack bot token not configured. Set SLACK_BOT_TOKEN environment variable.'}
     
-    headers = {'Authorization': f'Bearer {SLACK_BOT_TOKEN}'}
-    messages = []
-    
-    # Calculate timestamp 24 hours ago (in seconds since epoch)
-    date_24h_ago = datetime.now(timezone.utc) - timedelta(hours=24)
-    oldest_timestamp = int(date_24h_ago.timestamp())
-    
     try:
-        # First, get all channels the bot is a member of
-        channels_response = requests.get(
-            f'{SLACK_API_URL}/conversations.list',
+        messages = []
+        
+        # Zapier MCP requires Accept: text/event-stream for SSE responses
+        headers = {
+            'Authorization': f'Bearer {SLACK_BOT_TOKEN}',
+            'Content-Type': 'application/json',
+            'Accept': 'text/event-stream'
+        }
+        
+        # First, list channels
+        channels_response = requests.post(
+            'https://mcp.zapier.com/api/v1/connect',
             headers=headers,
-            params={'types': 'public_channel,private_channel'}
+            json={'jsonrpc': '2.0', 'method': 'slack_list_channels', 'params': {}, 'id': 1},
+            timeout=30,
+            stream=True
         )
-        channels_data = channels_response.json()
         
-        if not channels_data.get('ok'):
-            return {'error': f'Slack API error: {channels_data.get("error", "Unknown error")}'}
+        if channels_response.status_code != 200:
+            return {'error': f'Zapier MCP error: {channels_response.status_code}'}
         
-        channels = channels_data.get('channels', [])
+        # Parse SSE response
+        channels_data = []
+        for line in channels_response.iter_lines():
+            if line:
+                line = line.decode('utf-8')
+                if line.startswith('data: '):
+                    data_str = line[6:]  # Remove 'data: '
+                    try:
+                        data = json.loads(data_str)
+                        if 'result' in data:
+                            channels_data = data['result'].get('channels', [])
+                    except:
+                        pass
         
-        for channel in channels:
-            channel_id = channel['id']
-            channel_name = channel['name']
+        date_24h_ago = datetime.now(timezone.utc) - timedelta(hours=24)
+        
+        for channel in channels_data:
+            channel_id = channel.get('id')
+            channel_name = channel.get('name')
             
-            # Fetch history for this channel
-            history_response = requests.get(
-                f'{SLACK_API_URL}/conversations.history',
+            if not channel_id:
+                continue
+            
+            # Get channel history
+            history_response = requests.post(
+                'https://mcp.zapier.com/api/v1/connect',
                 headers=headers,
-                params={
-                    'channel': channel_id,
-                    'oldest': oldest_timestamp,
-                    'limit': 100
-                }
+                json={
+                    'jsonrpc': '2.0',
+                    'method': 'slack_conversations_history',
+                    'params': {'channel': channel_id},
+                    'id': 2
+                },
+                timeout=30,
+                stream=True
             )
-            history_data = history_response.json()
             
-            if history_data.get('ok'):
-                for msg in history_data.get('messages', []):
-                    # Skip bot messages, messages without text, or join/leave events
-                    if not msg.get('text') or msg.get('subtype') in ['bot_message', 'channel_join', 'channel_leave', 'channel_topic']:
-                        continue
-                    
-                    # Get user info
-                    user_name = msg.get('user', 'Unknown')
-                    if msg.get('user'):
-                        user_response = requests.get(
-                            f'{SLACK_API_URL}/users.info',
-                            headers=headers,
-                            params={'user': msg.get('user')}
-                        )
-                        user_data = user_response.json()
-                        if user_data.get('ok'):
-                            user_name = user_data['user'].get('real_name') or user_data['user'].get('name', 'Unknown')
-                    
-                    # Convert timestamp to ISO format
-                    ts = float(msg.get('ts', 0))
-                    msg_time = datetime.fromtimestamp(ts, tz=timezone.utc)
-                    
-                    messages.append({
-                        'channel': channel_name,
-                        'user': user_name,
-                        'text': msg.get('text', ''),
-                        'timestamp': msg_time.isoformat(),
-                        'thread': msg.get('thread_ts') is not None
-                    })
+            if history_response.status_code == 200:
+                # Parse SSE for history
+                for line in history_response.iter_lines():
+                    if line:
+                        line = line.decode('utf-8')
+                        if line.startswith('data: '):
+                            data_str = line[6:]
+                            try:
+                                data = json.loads(data_str)
+                                if 'result' in data:
+                                    for msg in data['result'].get('messages', []):
+                                        # Skip empty or system messages
+                                        if not msg.get('text') or msg.get('subtype', '') in ['bot_message', 'channel_join', 'channel_leave']:
+                                            continue
+                                        
+                                        # Convert timestamp
+                                        ts = float(msg.get('ts', 0))
+                                        msg_time = datetime.fromtimestamp(ts, tz=timezone.utc)
+                                        
+                                        if msg_time < date_24h_ago:
+                                            continue
+                                        
+                                        messages.append({
+                                            'channel': channel_name,
+                                            'user': msg.get('user', 'Unknown'),
+                                            'text': msg.get('text', ''),
+                                            'timestamp': msg_time.isoformat(),
+                                            'thread': bool(msg.get('thread_ts'))
+                                        })
+                            except:
+                                pass
         
-        # Sort by timestamp (newest first)
         messages.sort(key=lambda x: x['timestamp'], reverse=True)
-        
         return messages
         
     except Exception as e:
