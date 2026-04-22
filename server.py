@@ -6,6 +6,7 @@ Fetches daily emails from Gmail and serves the web interface.
 import os
 import base64
 import email
+import requests
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 
@@ -22,8 +23,13 @@ app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-producti
 SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
 CLIENT_SECRETS_FILE = os.path.join(os.path.dirname(__file__), 'client_secret.json')
 
+# Slack API configuration
+SLACK_BOT_TOKEN = os.environ.get('SLACK_BOT_TOKEN')
+SLACK_API_URL = 'https://slack.com/api'
+
 # Simple in-memory cache
 email_cache = {}
+slack_cache = {}
 CACHE_TTL = 300  # 5 minutes
 
 
@@ -251,8 +257,112 @@ def health():
     return jsonify({
         'status': 'healthy',
         'configured': has_secret,
+        'gmail_configured': has_secret,
+        'slack_configured': bool(SLACK_BOT_TOKEN),
         'message': 'client_secret.json found' if has_secret else 'client_secret.json not found - configure Google OAuth first'
     })
+
+
+def fetch_slack_messages():
+    """Fetch Slack messages from the last 24 hours."""
+    if not SLACK_BOT_TOKEN:
+        return {'error': 'Slack bot token not configured. Set SLACK_BOT_TOKEN environment variable.'}
+    
+    headers = {'Authorization': f'Bearer {SLACK_BOT_TOKEN}'}
+    messages = []
+    
+    # Calculate timestamp 24 hours ago (in seconds since epoch)
+    date_24h_ago = datetime.now(timezone.utc) - timedelta(hours=24)
+    oldest_timestamp = int(date_24h_ago.timestamp())
+    
+    try:
+        # First, get all channels the bot is a member of
+        channels_response = requests.get(
+            f'{SLACK_API_URL}/conversations.list',
+            headers=headers,
+            params={'types': 'public_channel,private_channel'}
+        )
+        channels_data = channels_response.json()
+        
+        if not channels_data.get('ok'):
+            return {'error': f'Slack API error: {channels_data.get("error", "Unknown error")}'}
+        
+        channels = channels_data.get('channels', [])
+        
+        for channel in channels:
+            channel_id = channel['id']
+            channel_name = channel['name']
+            
+            # Fetch history for this channel
+            history_response = requests.get(
+                f'{SLACK_API_URL}/conversations.history',
+                headers=headers,
+                params={
+                    'channel': channel_id,
+                    'oldest': oldest_timestamp,
+                    'limit': 100
+                }
+            )
+            history_data = history_response.json()
+            
+            if history_data.get('ok'):
+                for msg in history_data.get('messages', []):
+                    # Skip bot messages, messages without text, or join/leave events
+                    if not msg.get('text') or msg.get('subtype') in ['bot_message', 'channel_join', 'channel_leave', 'channel_topic']:
+                        continue
+                    
+                    # Get user info
+                    user_name = msg.get('user', 'Unknown')
+                    if msg.get('user'):
+                        user_response = requests.get(
+                            f'{SLACK_API_URL}/users.info',
+                            headers=headers,
+                            params={'user': msg.get('user')}
+                        )
+                        user_data = user_response.json()
+                        if user_data.get('ok'):
+                            user_name = user_data['user'].get('real_name') or user_data['user'].get('name', 'Unknown')
+                    
+                    # Convert timestamp to ISO format
+                    ts = float(msg.get('ts', 0))
+                    msg_time = datetime.fromtimestamp(ts, tz=timezone.utc)
+                    
+                    messages.append({
+                        'channel': channel_name,
+                        'user': user_name,
+                        'text': msg.get('text', ''),
+                        'timestamp': msg_time.isoformat(),
+                        'thread': msg.get('thread_ts') is not None
+                    })
+        
+        # Sort by timestamp (newest first)
+        messages.sort(key=lambda x: x['timestamp'], reverse=True)
+        
+        return messages
+        
+    except Exception as e:
+        return {'error': str(e)}
+
+
+@app.route('/api/slack/messages')
+def api_slack_messages():
+    """Fetch Slack messages for the authenticated user."""
+    global slack_cache
+    
+    # Check cache
+    cache_key = 'messages'
+    if cache_key in slack_cache:
+        cached_time, cached_messages = slack_cache[cache_key]
+        if (datetime.now(timezone.utc) - cached_time).total_seconds() < CACHE_TTL:
+            return jsonify({'messages': cached_messages, 'cached': True})
+    
+    result = fetch_slack_messages()
+    
+    if isinstance(result, dict) and 'error' in result:
+        return jsonify(result), 400
+    
+    slack_cache[cache_key] = (datetime.now(timezone.utc), result)
+    return jsonify({'messages': result, 'cached': False})
 
 
 if __name__ == '__main__':
