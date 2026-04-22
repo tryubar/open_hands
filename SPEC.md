@@ -4,8 +4,8 @@
 
 **Project Name**: Gmail Daily Dashboard  
 **Type**: Web Application (Flask + Vanilla JS)  
-**Core Functionality**: Fetches daily emails from a user's Gmail account via the Gmail API and displays them in a clean, organized web interface.  
-**Target Users**: Individuals who want to quickly view their recent emails in a distraction-free web interface.
+**Core Functionality**: Fetches daily emails from Gmail and messages from Slack, displaying them in a clean dashboard interface.  
+**Target Users**: Individuals who want to quickly view their recent emails and Slack messages in a distraction-free web interface.
 
 ---
 

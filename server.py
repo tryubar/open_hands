@@ -9,6 +9,9 @@ import email
 import requests
 from datetime import datetime, timedelta, timezone
 from functools import wraps
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from flask import Flask, request, redirect, session, jsonify, render_template
 from google.auth.transport.requests import Request

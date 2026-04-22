@@ -3,3 +3,4 @@ __pycache__/
 server.log
 gmail-dashboard.tar.gz
 open_hands/
+.env
