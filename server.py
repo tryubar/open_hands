@@ -385,7 +385,29 @@ def api_slack_messages():
     result = fetch_slack_messages()
     
     if isinstance(result, dict) and 'error' in result:
-        return jsonify(result), 400
+        # Return demo messages if no Slack configured yet
+        demo_messages = [
+            {
+                'channel': 'general',
+                'user': 'Demo User',
+                'text': 'Welcome to the Gmail + Slack Dashboard!',
+                'timestamp': datetime.now(timezone.utc).isoformat(),
+                'thread': False
+            },
+            {
+                'channel': 'general',
+                'user': 'Bot',
+                'text': 'Connect your Slack workspace to see real messages',
+                'timestamp': (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat(),
+                'thread': False
+            }
+        ]
+        return jsonify({
+            'messages': demo_messages, 
+            'cached': False,
+            'demo': True,
+            'note': result.get('error')
+        })
     
     slack_cache[cache_key] = (datetime.now(timezone.utc), result)
     return jsonify({'messages': result, 'cached': False})
