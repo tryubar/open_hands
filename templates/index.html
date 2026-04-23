@@ -649,6 +649,102 @@
             color: #202124;
         }
 
+        /* Logo Search */
+        .logo-search-section {
+            background: #ffffff;
+            border: 1px solid #dadce0;
+            border-radius: 8px;
+            padding: 24px;
+            margin-bottom: 16px;
+        }
+
+        .logo-search-section h3 {
+            margin: 0 0 8px 0;
+            font-size: 18px;
+            color: #202124;
+        }
+
+        .logo-search-section .hint {
+            color: #5f6368;
+            font-size: 14px;
+            margin-bottom: 16px;
+        }
+
+        .search-box {
+            display: flex;
+            gap: 12px;
+        }
+
+        .search-box input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 1px solid #dadce0;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+
+        .search-box input:focus {
+            outline: none;
+            border-color: #1a73e8;
+            box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.2);
+        }
+
+        .search-btn {
+            padding: 12px 24px;
+            background: #1a73e8;
+            color: #ffffff;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        .search-btn:hover {
+            background: #1557b0;
+        }
+
+        .logo-results {
+            background: #ffffff;
+            border: 1px solid #dadce0;
+            border-radius: 8px;
+            padding: 24px;
+        }
+
+        .logo-card {
+            display: flex;
+            gap: 24px;
+            align-items: flex-start;
+        }
+
+        .logo-card img {
+            max-width: 200px;
+            max-height: 150px;
+            object-fit: contain;
+            border: 1px solid #dadce0;
+            padding: 16px;
+            background: #f8f9fa;
+        }
+
+        .logo-info h4 {
+            margin: 0 0 8px 0;
+            font-size: 18px;
+            color: #202124;
+        }
+
+        .logo-info p {
+            margin: 0 0 12px 0;
+            color: #5f6368;
+        }
+
+        .logo-link {
+            color: #1a73e8;
+            text-decoration: none;
+        }
+
+        .logo-link:hover {
+            text-decoration: underline;
+        }
+
         /* Footer */
         .footer {
             text-align: center;
@@ -717,6 +813,12 @@
                         <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM8 15.01l1.41 1.41L11 14.84V17h2v-2.16l1.59 1.59L16 15.01 12.01 11 8 15.01z"/>
                     </svg>
                     Proposal
+                </button>
+                <button class="nav-btn" id="navLogo" onclick="switchTab('logo')">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.28z"/>
+                    </svg>
+                    Logos
                 </button>
             </nav>
             <div class="user-info hidden" id="userInfo">
@@ -920,6 +1022,42 @@
                 <div class="proposal-content" id="proposalContent"></div>
             </div>
         </section>
+
+        <!-- Logo Search Section -->
+        <section class="hidden" id="logoDashboard">
+            <div class="logo-search-section">
+                <h3>Find Government Agency Logos</h3>
+                <p class="hint">Enter a government agency name to search for their official logo</p>
+                
+                <div class="search-box">
+                    <input type="text" id="agencyInput" placeholder="e.g., FBI, CIA, NASA, EPA, USPS...">
+                    <button class="search-btn" onclick="searchLogos()">Search</button>
+                </div>
+            </div>
+
+            <!-- Loading -->
+            <div class="loading hidden" id="logoLoading">
+                <div class="spinner"></div>
+                <p>Searching for logos...</p>
+            </div>
+
+            <!-- Error State -->
+            <div class="error-state hidden" id="logoError">
+                <p>Unable to find logo. Please try another agency name.</p>
+            </div>
+
+            <!-- Logo Results -->
+            <div class="logo-results hidden" id="logoResults">
+                <div class="logo-card">
+                    <img id="logoImage" src="" alt="Agency Logo">
+                    <div class="logo-info">
+                        <h4 id="agencyName">Agency Name</h4>
+                        <p id="agencyDesc">Description</p>
+                        <a id="logoLink" href="" target="_blank" class="logo-link">View Full Size</a>
+                    </div>
+                </div>
+            </div>
+        </section>
     </main>
 
     <!-- Footer -->
@@ -934,6 +1072,7 @@
         let slackMessages = [];
         let stockData = null;
         let proposalData = null;
+        let logoData = null;
         let currentTab = 'gmail';
 
         // Initialize on load
@@ -980,15 +1119,18 @@
             document.getElementById('navSlack').classList.toggle('active', tab === 'slack');
             document.getElementById('navStock').classList.toggle('active', tab === 'stock');
             document.getElementById('navProposal').classList.toggle('active', tab === 'proposal');
+            document.getElementById('navLogo').classList.toggle('active', tab === 'logo');
             
             // Show/hide sections
             document.getElementById('emailDashboard').classList.toggle('hidden', tab !== 'gmail');
             document.getElementById('slackDashboard').classList.toggle('hidden', tab !== 'slack');
             document.getElementById('stockDashboard').classList.toggle('hidden', tab !== 'stock');
             document.getElementById('proposalDashboard').classList.toggle('hidden', tab !== 'proposal');
+            document.getElementById('logoDashboard').classList.toggle('hidden', tab !== 'logo');
             
             // Update page title
-            document.title = tab === 'proposal' ? 'Proposal Generator' : 'Gmail Dashboard';
+            const titles = { gmail: 'Gmail Dashboard', slack: 'Slack Messages', stock: 'Stock CCL', proposal: 'Proposal Generator', logo: 'Logo Search' };
+            document.title = titles[tab] || 'Gmail Dashboard';
             
             // Load data if needed
             if (tab === 'gmail' && emails.length === 0) {
@@ -1434,6 +1576,59 @@
                 setTimeout(() => btn.textContent = 'Copy', 2000);
             }
         }
+
+        // Logo Search Functions
+        async function searchLogos() {
+            const agency = document.getElementById('agencyInput').value.trim();
+            if (!agency) {
+                alert('Please enter an agency name');
+                return;
+            }
+
+            const loading = document.getElementById('logoLoading');
+            const error = document.getElementById('logoError');
+            const results = document.getElementById('logoResults');
+            const searchBtn = document.querySelector('.search-btn');
+
+            // Show loading
+            loading.classList.remove('hidden');
+            error.classList.add('hidden');
+            results.classList.add('hidden');
+            searchBtn.disabled = true;
+
+            try {
+                const response = await fetch(`/api/logo/search?q=${encodeURIComponent(agency)}`);
+                const data = await response.json();
+
+                loading.classList.add('hidden');
+
+                if (data.error || !data.logo_url) {
+                    error.classList.remove('hidden');
+                    return;
+                }
+
+                // Display results
+                logoData = data;
+                document.getElementById('logoImage').src = data.logo_url;
+                document.getElementById('agencyName').textContent = data.agency_name || agency;
+                document.getElementById('agencyDesc').textContent = data.description || '';
+                document.getElementById('logoLink').href = data.logo_url;
+                
+                results.classList.remove('hidden');
+            } catch (err) {
+                loading.classList.add('hidden');
+                error.classList.remove('hidden');
+            } finally {
+                searchBtn.disabled = false;
+            }
+        }
+
+        // Handle Enter key
+        document.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && document.getElementById('logoDashboard').classList.contains('hidden') === false) {
+                searchLogos();
+            }
+        });
     </script>
 </body>
 </html>

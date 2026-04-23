@@ -610,5 +610,70 @@ This proposal is valid for 30 days from the date of generation.
     return proposal
 
 
+# Logo Search API
+@app.route('/api/logo/search')
+def api_logo_search():
+    """Search for a government agency logo."""
+    query = request.args.get('q', '').strip()
+    
+    if not query:
+        return jsonify({'error': 'Please provide an agency name'}), 400
+    
+    try:
+        # Search for logo using Wikipedia/Wikimedia API
+        # First, search for the agency on Wikipedia
+        search_url = 'https://en.wikipedia.org/w/api.php'
+        search_params = {
+            'action': 'query',
+            'list': 'search',
+            'srsearch': f'{query} logo',
+            'format': 'json',
+            'origin': '*'
+        }
+        
+        search_resp = requests.get(search_url, params=search_params, timeout=10)
+        search_data = search_resp.json()
+        
+        pages = search_data.get('query', {}).get('search', [])
+        
+        if not pages:
+            return jsonify({'error': 'Agency not found'}), 404
+        
+        # Get the first page title
+        page_title = pages[0]['title']
+        
+        # Get page info and image
+        info_url = 'https://en.wikipedia.org/w/api.php'
+        info_params = {
+            'action': 'query',
+            'titles': page_title,
+            'prop': 'pageimages|info',
+            'pithumbsize': 500,
+            'format': 'json',
+            'origin': '*'
+        }
+        
+        info_resp = requests.get(info_url, params=info_params, timeout=10)
+        info_data = info_resp.json()
+        
+        pages = info_data.get('query', {}).get('pages', {})
+        page = list(pages.values())[0] if pages else {}
+        
+        image_url = page.get('thumbnail', {}).get('source', '')
+        
+        if not image_url:
+            # Try to get logo from Openverse or a fallback
+            image_url = f'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a4/Question_Mark.svg/200px-Question_Mark.svg.png'
+        
+        return jsonify({
+            'agency_name': page_title,
+            'logo_url': image_url,
+            'description': page.get('extract', '')[:200] if page.get('extract') else ''
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
